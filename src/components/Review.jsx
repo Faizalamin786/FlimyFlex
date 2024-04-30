@@ -1,123 +1,187 @@
-import React, { useContext, useEffect, useState } from 'react'
-import ReactStars from 'react-stars'
-import {reviewsRef, db} from './firebase/firebase'
-import { addDoc, doc, updateDoc, query, where, getDocs } from 'firebase/firestore'
-import { TailSpin, ThreeDots } from 'react-loader-spinner'
-import swal from 'sweetalert'
-import {Appstate} from '../App';
-import { useNavigate } from 'react-router-dom'
+import ReactStars from "react-rating-stars-component";
+import { reviewsRef } from "./firebase/firebase";
+import { addDoc, query } from "firebase/firestore";
+import { useEffect, useState } from "react";
+import { TailSpin, ThreeDots } from "react-loader-spinner";
+import swal from "sweetalert";
+import { updateDoc, doc } from "firebase/firestore";
+import { db } from "./firebase/firebase";
+import { where, getDocs } from "firebase/firestore";
+import { useContext } from "react";
+import { Appstate } from "../App";
+import { useNavigate } from "react-router-dom";
+import { useRef } from "react";
+import { Link } from "react-router-dom";
 
-const Reviews = ({id, prevRating, userRated}) => {
-    const useAppstate = useContext(Appstate);
-    const navigate = useNavigate();
-    const [rating, setRating] = useState(0);
-    const [loading, setLoading] = useState(false);
-    const [reviewsLoading, setReviewsLoading] = useState(false);
-    const [form, setForm] = useState("");
-    const [data, setData] = useState([]);
-    const [newAdded, setNewAdded] = useState(0);
 
-    const sendReview = async () => {
-        setLoading(true);
-        try {
-            if(useAppstate.login) {
-            await addDoc(reviewsRef, {
-                movieid: id,
-                name: useAppstate.userName,
-                rating: rating,
-                thought: form,
-                timestamp: new Date().getTime()
-            })
+const Review = ({ id, prevRating, userRated, setDetailReRender, detailReRender }) => {
+  const buttonRef = useRef();
+  const handleKeyUp = (event)=>{
+    if(event.key==="Enter"){
+        buttonRef.current.click();
+    }
+  }
 
-            const ref = doc(db, "movies", id);
-            await updateDoc(ref, {
-                rating: prevRating + rating,
-                rated: userRated + 1
-            })
+  const useAppstate = useContext(Appstate);
+  const navigate = useNavigate();
 
-            setRating(0);
-            setForm("");
-            setNewAdded(newAdded + 1);
-            swal({
-                title: "Review Sent",
-                icon: "success",
-                buttons: false,
-                timer: 3000
-              })
-            } else {
-                navigate('/login')
-            }
-        } catch (error) {
-            swal({
-                title: error.message,
-                icon: "error",
-                buttons: false,
-                timer: 3000
-              })
+  const [rating, setRating] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [thoughtVal, setThoughtVal] = useState("");
+  const [reRender, changereRender] = useState(1);
+
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewData, setReviewData] = useState([]);
+
+  const resetRating = () => {
+    changereRender(reRender + 1);
+    setRating(0);
+  };
+
+  const sendReview = async () => {
+    setLoading(true);
+
+    try {
+      if (useAppstate.login) {
+        if (rating === 0 || thoughtVal === "") {
+          throw new Error("Share Rating and Review Both");
         }
-        setLoading(false);
+
+        await addDoc(reviewsRef, {
+          movieid: id,
+          name: useAppstate.userName,
+          rating: rating,
+          thought: thoughtVal,
+          timestamp: new Date().getTime(),
+        });
+
+        const docRef = doc(db, "movies", id);
+        await updateDoc(docRef, {
+          rating: prevRating + rating,
+          userRated: userRated + 1,
+        });
+        
+        changereRender(reRender+2)
+        resetRating();
+        setThoughtVal("");
+
+
+        swal({
+          title: "Review Sent",
+          icon: "success",
+          button: false,
+          timer: 3000,
+        });
+      }
+
+      else{
+        window.alert("Please Login First");
+        navigate("/login")
+      }
+    } catch (err) {
+      swal({
+        title: err,
+        icon: "error",
+        button: false,
+        timer: 6000,
+      });
     }
 
-    useEffect(() => {
-        async function getData() {
-            setReviewsLoading(true);
-            setData([]);
-            let quer = query(reviewsRef, where('movieid', '==', id))
-            const querySnapshot = await getDocs(quer);
 
-            querySnapshot.forEach((doc) => {
-                setData((prev) => [...prev, doc.data()])
-            })
+    setLoading(false);
+    
+    
 
-            setReviewsLoading(false);
-        }
-        getData();
-    },[newAdded])
+  };
+
+  useEffect(() => {
+    async function getData() {
+      setReviewLoading(true);
+      setReviewData([])
+      
+      let quer = query(reviewsRef, where("movieid", "==", id));
+      const queryData = await getDocs(quer);
+
+      queryData.forEach((doc) => {
+        setReviewData((prev) => [...prev, doc.data()]);
+      });
+
+      setReviewLoading(false);
+    }
+    getData();
+  }, [reRender, id]);
+
 
   return (
-    <div className='mt-4 border-t-2 border-gray-700 w-full'>
-        <ReactStars
-            size={30}
-            half={true}
-            value={rating}
-            onChange={(rate) => setRating(rate)}
-        />
-        <input 
-            value={form}
-            onChange={(e) => setForm(e.target.value)}
-            placeholder='Share Your thoughts...'
-            className='w-full p-2 outline-none header'
-        />
-        <button onClick={sendReview} className='bg-green-600 flex justify-center w-full p-2'>
-            {loading ? <TailSpin height={20} color="white" /> : 'Share'}
-        </button>
+    <div className="mt-4 border-t-2 pt-3 border-gray-50 disable-text-selection">
 
-        {reviewsLoading ? 
-            <div className='mt-6 flex justify-center'><ThreeDots height={10} color="white" /></div>
-        :
-        <div className='mt-4'>
-            {data.map((e, i) => {
-                return(
-                    <div className=' p-2 w-full border-b header bg-opacity-50 border-gray-600 mt-2' key={i}>
-                        <div className='flex items-center'>
-                            <p className='text-blue-500'>{e.name}</p>
-                            <p className='ml-3 text-xs'>({new Date(e.timestamp).toLocaleString()})</p>
-                        </div>
-                        <ReactStars
-                            size={15}
-                            half={true}
-                            value={e.rating}
-                            edit={false}
-                        />
-
-                        <p>{e.thought}</p>
-                    </div>     
-                )
-            })}
-        </div>
-        }
+    <div className="react-stars-div">
+    <Link to={""} onClick={(e)=> e.preventDefault()}>
+      <ReactStars
+        key={reRender}
+        edit={true}
+        isHalf={true}
+        size={28}
+        value={rating}
+        onChange={(newRat) => setRating(newRat)}
+      />
+    </Link>
     </div>
-  )
-}
 
-export default Reviews
+      <input
+        onKeyUp={handleKeyUp}
+
+        value={thoughtVal}
+        onChange={(e) => setThoughtVal(e.target.value)}
+        type="text"
+        placeholder="Share Your Review... "
+        className="w-full mt-2 text-xl p-2 outline-none bg-gray-800 "
+      />
+      <button
+        ref={buttonRef}
+        
+        onClick={sendReview}
+        className="bg-green-600 w-full p-2 text-xl mt-1 flex justify-center"
+      >
+        {loading ? <TailSpin color="white" height={28} /> : "Share"}
+      </button>
+
+      {reviewLoading ? (
+        <div className="flex justify-center mt-[-10px]">
+          {" "}
+          <ThreeDots color="cyan" width={55} />{" "}
+        </div>
+      ) : (
+        <div className="mt-4">
+          {reviewData.map((element, index) => {
+            return (
+              <div
+                key={index}
+                className="bg-gray-800 p-2 mt-2 border-b-2 border-gray-500"
+              >
+                <div className="flex">
+                  <p className="text-blue-400 ">{element.name}</p>
+                  <p className="ml-3 text-xs mt-1">
+                    ({new Date(element.timestamp).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',  hour12: true }) })
+                  </p>
+                </div>
+
+                <ReactStars
+                  key={reRender}
+                  edit={false}
+                  isHalf={true}
+                  size={17}
+                  value={element.rating}
+                />
+
+                <p>{element.thought}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Review;

@@ -7,6 +7,7 @@ import { createContext, useEffect, useState } from "react";
 import Login from './components/Login'
 import Signup from './components/Signup'
 
+
 const Appstate = createContext();
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
     <Appstate.Provider value={{login, userName, setLogin, setUserName}} >
     <div className="App relative">
       <Header />
+    
       <Routes>
         <Route path="/" element={<Cards />} />
         <Route path="/addmovie" element={<AddMovie />} />
